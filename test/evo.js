@@ -62,10 +62,10 @@ function run() {
 
   //did output2 meet its goal
   if (output2 > goal2 && 0 > output2) {
-    console.log("output1 success");
+    console.log("output2 success");
     success = success + 0.5;
   } else {
-    console.log("output1 fail");
+    console.log("output2 fail");
   }
   //was there an overall success?
   if (success == 1) {
