@@ -30,6 +30,6 @@ var fill = percentageToRGB(Math.floor(Math.random()*100), Math.floor(Math.random
 
     cursorX = e.pageX;
     cursorY = e.pageY;
-    console.log("mouse moving");
-    circle(cursorX, cursorY, Math.random()*200, fill, 0, fill);
+    console.log("added a ball.");
+    circle(cursorX, cursorY, document.getElementById("sizeSlider").value, fill, 0, fill);
 }
