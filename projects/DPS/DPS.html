@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SAS4 DPS Calculator</title>
+  </head>
+  <body align="center">
+    <p>
+      Fill in the below boxes with the data they ask for. Empty ones will cause it to display NaN, so put 0 if there is none. <br>
+      <input type="text" id="name" placeholder="Gun Name (optional)" value="">
+      <input type="number" id="basedmg" placeholder="Base Weapon Damage" min="0">
+      <input type="number" id="plusdmg" placeholder="Added Weapon Damage" min="0">
+      <input type="number" id="baserps" placeholder="Base RPS" min="0">
+      <input type="number" id="plusrps" placeholder="Added RPS" min="0">
+      <br>
+      <input type="checkbox" id="ammo">check/tick to enable HD Ammo, then select HD Ammo Mastery Level
+      <select id="ammolvl">
+        <option value="1">0 or 1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+      </select>
+    </p>
+    <button type="button" id="run" onclick="run();">calculate</button>
+    <script type="text/javascript" src="DPS.js"></script>
+    <br>
+    <textarea id="output" rows="16" cols="60" placeholder="Final DPS will appear here. Everytime it is calculated it will be added to the bottom of the box as to compare guns. Reload page to reset.
+"></textarea> <br>
+    <img src="dpscalc.png" alt="Explanation" width="992" height="800">
+  </body>
+</html>
