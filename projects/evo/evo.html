@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>evo</title>
+  </head>
+  <body>
+    Red for top output goal <input data-toggle="tooltip" onchange="this.title=this.value;" title="50" type="range" id="goalRX">
+    Green for top output goal <input data-toggle="tooltip" onchange="this.title=this.value;" title="50" type="range" id="goalGX">
+    Blue for top output goal <input data-toggle="tooltip" onchange="this.title=this.value;" title="50" type="range" id="goalBX">
+    <br>
+    Red for bottom output goal <input data-toggle="tooltip" onchange="this.title=this.value;" title="50" type="range" id="goalRY">
+    Green for bottom output goal <input data-toggle="tooltip" onchange="this.title=this.value;" title="50" type="range" id="goalGY">
+    Blue for bottom output goal <input data-toggle="tooltip" onchange="this.title=this.value;" title="50" type="range" id="goalBY">
+    <br>
+    population count: <input type="number" id="popuCount" min="0" max="10000" value="100"> you should hit generate again everytime you want to go over the number you started with.
+    <br>
+    <canvas id="canvas">If you see this, it means you browser is incompatible or a glitch has occured. I recommend installing Chrome.</canvas>
+		<script type="text/javascript" src="evo.js"></script>
+    <button onclick="generate();">generate</button>
+    <button onclick="evolve = setInterval(mate, 1);">evolve</button>
+    <button onclick="clearInterval(evolve);">pause</button>
+    <button onclick="mate();">mate</button>
+  </body>
+</html>
