@@ -1,8 +1,8 @@
 //canvas
 var canvas = geid('canvas');
-var context = canvas.getContext('2d');
-canvas.width = 1000
-canvas.height = 1000
+var ctx = canvas.getContext('2d');
+canvas.width = 1000;
+canvas.height = 950;
 function geid(id) {return document.getElementById(id);}
 //population
 // each member of the population should look like {value1: 123 value 2 : 123, etc}
@@ -26,6 +26,23 @@ function getGoals() {
   goalY = percentageToRGB(goalRY, goalGY, goalBY);
 }
 getGoals()
+
+function randomize() {
+  geid("goalRX").value = rand();
+  geid("goalBX").value = rand();
+  geid("goalGX").value = rand();
+  geid("goalRY").value = rand();
+  geid("goalGY").value = rand();
+  geid("goalBY").value = rand();
+}
+function setSpeed() {
+  clearInterval(evolve);
+  evolve = setInterval(mate, geid("evoSpeed").value);
+}
+//this is done so that the the setSpeed function does not throw an undefined error when you hit it the first time.
+evolve = setInterval(mate, 10000000);
+clearInterval(evolve);
+
 //a function that turns values from 0-100 into colors.
 function percentageToRGB(r,g,b) {
     var r = parseInt(r * 2.55);
@@ -36,22 +53,22 @@ function percentageToRGB(r,g,b) {
 }
 //A function for making circles.
 function circle(posX, posY, radius, fillColor, line, lineColor) {
-  context.beginPath();
-  context.arc(posX, posY, radius, 0, 2 * Math.PI, false);
-  context.fillStyle = fillColor;
-  context.fill();
-  context.lineWidth = line;
-  context.strokeStyle = lineColor;
-  context.stroke();
+  ctx.beginPath();
+  ctx.arc(posX, posY, radius, 0, 2 * Math.PI, false);
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+  ctx.lineWidth = line;
+  ctx.strokeStyle = lineColor;
+  ctx.stroke();
 }
 
 function line(width, color, startx, starty, endx, endy) {
-  context.beginPath();
-  context.lineWidth = width;
-  context.strokeStyle = color
-  context.moveTo(startx, starty);
-  context.lineTo(endx, endy);
-  context.stroke();
+  ctx.beginPath();
+  ctx.lineWidth = width;
+  ctx.strokeStyle = color
+  ctx.moveTo(startx, starty);
+  ctx.lineTo(endx, endy);
+  ctx.stroke();
 }
 //for input circles
 var inputRed = percentageToRGB(100, 0, 0);
@@ -64,6 +81,7 @@ function birth(birthplace, gen, a1, a2, a3, a4, b1, b2, b3, b4, c1, c2, c3, c4, 
   popu[birthplace] = {
     home:birthplace,
     gen:gen,
+    dev:null,
     a1:a1,
     a2:a2,
     a3:a3,
@@ -159,22 +177,24 @@ function mutate(popuHome) {
 
 }
 function sq(num) {return num*num;}
+function getDev() {
+  return sq(goalRX-outputRX)+sq(goalGX-outputGX)+sq(goalBX-outputBX)+sq(goalRY-outputRY)+sq(goalGY-outputGY)+sq(goalBY-outputBY);
+}
 function mate() {
   getGoals();
   getPopuCount();
   //select 3 members of popu to compete
   mate1 = Math.floor(Math.random()*popuCount);
   drawCreature(mate1);
-  //antifitness, weakness
-  mate1Dev = sq(goalRX-outputRX)+sq(goalGX-outputGX)+sq(goalBX-outputBX)+sq(goalRY-outputRY)+sq(goalGY-outputGY)+sq(goalBY-outputBY)
-
+  //deviation = antifitness, weakness
+  mate1Dev = getDev();
   mate2 = Math.floor(Math.random()*popuCount);
   drawCreature(mate2);
-  mate2Dev = sq(goalRX-outputRX)+sq(goalGX-outputGX)+sq(goalBX-outputBX)+sq(goalRY-outputRY)+sq(goalGY-outputGY)+sq(goalBY-outputBY)
+  mate2Dev = getDev();
 
   mate3 = Math.floor(Math.random()*popuCount);
   drawCreature(mate3);
-  mate3Dev = sq(goalRX-outputRX)+sq(goalGX-outputGX)+sq(goalBX-outputBX)+sq(goalRY-outputRY)+sq(goalGY-outputGY)+sq(goalBY-outputBY)
+  mate3Dev = getDev();
 
 
   if (mate1Dev > mate2Dev && mate1Dev > mate3Dev) {
@@ -223,7 +243,7 @@ function drawCreature(popuHome) {
 
   critter = popu[popuHome];
   //clear canvas
-  context.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   //line from inputs too hidden nodes
   line((critter.a1)/5, percentageToRGB(critter.a1, 0, 0), 300, 300, 600, 200);
   line((critter.a2)/5, percentageToRGB(critter.a2, 0, 0), 300, 300, 600, 400);
@@ -323,6 +343,17 @@ function drawCreature(popuHome) {
 
   circle(900, 350, 60, percentageToRGB(outputRX, outputGX, outputBX), 20, goalX);
   circle(900, 650, 60, percentageToRGB(outputRY, outputGY, outputBY), 20, goalY);
+
+  critter.dev = getDev();
+  drawData();
+}
+function drawData() {
+  ctx.fillStyle = "black";
+  ctx.font = "16px Arial";
+  ctx.fillText("Generation: " + critter.gen,0,100);
+  ctx.fillText("Fitness Deviation: " + critter.dev.toFixed(3),0,120);
+  ctx.fillText("Home: " + critter.home,0,140);
+
 }
 
 //run function
