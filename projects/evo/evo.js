@@ -7,13 +7,13 @@ function geid(id) {return document.getElementById(id);}
 //population
 // each member of the population should look like {value1: 123 value 2 : 123, etc}
 var popuCount = geid("popuCount").value;
-var getPopuCount = function() {popuCount = geid("popuCount").value;}
+var getPopuCount = function() {popuCount = geid("popuCount").value;};
 var popu = [];
 //the below is done so that there is a max value (10000), that cannot be gone above.
 for (var i = 0; i < 10000; i++) {
   birth(i, 0, rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand(), rand());
 }
-
+//got goals?
 function getGoals() {
   goalRX = geid("goalRX").value;
   goalGX = geid("goalGX").value;
@@ -25,7 +25,7 @@ function getGoals() {
   goalBY = geid("goalBY").value;
   goalY = percentageToRGB(goalRY, goalGY, goalBY);
 }
-getGoals()
+getGoals();
 
 function randomize() {
   geid("goalRX").value = rand();
