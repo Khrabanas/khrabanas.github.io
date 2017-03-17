@@ -25,10 +25,58 @@ function deepClone(a) {
 }
 var worldW = 1000;
 var worldH = 1000;
+var worldR = 500;
+var centerX = worldW*0.5;
+var centerY = worldH*0.5;
+var marker = 0;
+var maxMarker = 50;
+var popMarks = [];
+var rendering = true;
+var birthHealth = 150;
+var births = 0;
+var mortality = [];
+var deaths = 0;
+var mC=0, fC=0;
+var plantPop = 0;
+var iterations = 0;
+var maxspeed = 100;
+var deadPlants = [];
+var plantDelay = 0;
+var plantThreshold = 25;
+var mutationRate = 0.02;
+var deliveryTime = 200;
+var litters = [];
+var maxIteration = 30000;
 canvas.width = worldW;
 canvas.height = worldH;
 ctx.font = "10px Arial";
-
+function setConst() {
+  worldH = 1000;
+  worldW = 1000;
+  worldR = 500;
+  centerX = worldW*0.5;
+  centerY = worldH*0.5;
+  marker = 0;
+  maxMarker = 50;
+  popMarks = [];
+  rendering = true;
+  birthHealth = 150;
+  births = 0;
+  mortality = [];
+  deaths = 0;
+  mC=0, fC=0;
+  plantPop = 0;
+  iterations = 0;
+  maxspeed = 100;
+  deadPlants = [];
+  plantDelay = 0;
+  plantThreshold = 25;
+  mutationRate = 0.02;
+  deliveryTime = 200;
+  litters = [];
+  maxIteration = 30000;
+}
+setConst();
 function clearCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
@@ -43,27 +91,50 @@ function newPop(popCount) {
     pop[i] = makeOrg(4, 3, i, rand()*worldW, rand()*worldH, rand()*2*Math.PI, 30, newGenes(), 0);
   }
 }
-
+var maxNutr = 25;
 var plants = [];
 function newHabitat(plantCount) {
   plants = [];
-  for (var i=0; i<plantCount;i++ ){
-    makePlant(i, 25*rand(), rand()*canvas.width, rand()*canvas.height);
+  deadPlants = [];
+  plantPop = 0;
+  for (var i=0; i<plantCount;i++ ) {
+    makePlant(i, maxNutr*rand(), rand()*canvas.width, rand()*canvas.height);
   }
 }
-
+function grow(index) {
+  if (plantPop == 0) {
+    makePlant(index, maxNutr*rand(), rand()*canvas.width, rand()*canvas.height);
+    return;
+  }
+  for (;;) {
+    var root = plants[Math.floor(plants.length*rand())];
+    if (root != null) {
+      var radius = maxNutr*rand();
+      var ang = rand()*Math.PI*2;
+      var x = root.x + Math.cos(ang)*(radius+root.cal);
+      var y = root.y - Math.sin(ang)*(radius+root.cal);
+      makePlant(index, radius, x, y);
+      break;
+    }
+  }
+}
 //just does what it does
 function poputat(popCount) {
   newPop(popCount);
   newHabitat(Math.round(popCount*2));
 }
+
 function makePlant(arrayPos, cal, x, y) {
-  plants[arrayPos] = {
-	cal:cal,
-	x:x,
-	y:y,
-	index:arrayPos,
+  plantPop++;
+  var p = {
+	  cal:cal,
+	  x:x,
+	  y:y,
+    radius:0,
+	  index:arrayPos,
   };
+  withinBounds(p);
+  plants[arrayPos] = p;
 }
 
 
@@ -78,18 +149,24 @@ function run(msecs) {
 	time = setInterval(iterate, msecs);
 	running = true;
 }
-function stop() {
+function stop(final) {
   if (time != null) {
     clearInterval(time);
     time = null;
   }
   running = false;
+  if (final && callBack) {
+    var fn = callBack;
+    callBack = null;
+    fn();
+  }
 }
 
 function newGenes(){
   return {
     syn:{},
     attr:{},
+    fixed:{},
   };
 }
 
@@ -112,12 +189,12 @@ function findAttr(genes, aid){
   return v;
 }
 function setAttr(genes, aid, value) {
-  var v = genes.attr[aid];
+  var v = genes.fixed[aid];
   if (v != null) {
     return v;
   }
   v = value;
-  genes.attr[aid] = v;
+  genes.fixed[aid] = v;
   return v;
 }
 //inputs and outputs are the two arrays that will be manually edited for now. they set the inputs and outputs.
@@ -147,6 +224,10 @@ var inputStore = {
     peLL2:{value:-1},
     peLL3:{value:-1},
     peLL4:{value:-1},
+
+    hunger:{value:0},
+    gender:{value:0}
+
 };
 var outputStore = {
     rot:{value:0},
@@ -191,7 +272,7 @@ function buildNet(hnCount, hlCount, genes) {
 		nn.inputs[input] = deepClone(nn.hLayers);
 		nn.inputs[input].value = inputStore[input].value;
 
-		for(var output in nn.outputs) {
+		for (var output in nn.outputs) {
 			if (!nn.outputs.hasOwnProperty(output)) {
 				continue;
 			}
@@ -271,12 +352,12 @@ function buildNet(hnCount, hlCount, genes) {
 
 //a network thinking.
 function readNet(nn) {
-	for(var layer in nn.hLayers) {
+	for (var layer in nn.hLayers) {
 		if (!nn.hLayers.hasOwnProperty(layer) || typeof(nn.hLayers[layer].layerNumber) !== "number") {
 			continue;
 		}
     var thisLayer = nn.hLayers[layer];
-		for(var node in thisLayer) {
+		for (var node in thisLayer) {
 			if (!thisLayer.hasOwnProperty(node) || typeof(thisLayer[node].nodeNumber) !== "number" ) {
 				continue;
 			}
@@ -332,8 +413,8 @@ function readNet(nn) {
   }
 }
 
-function decideGender(genes) {
-    if (findAttr(genes, "gender") < 0.5) {
+function decideGender() {
+    if (rand() < 0.5) {
         return 'male';
     } else {
         return 'female';
@@ -354,21 +435,25 @@ function makeOrg(hnCount, hlCount, netHome, x, y, rot, health, genes, gen) {
     org.gen = gen;
     org.x = x;
     org.y = y;
+    org.lifespan = 0;
+    org.radius = setAttr(genes, "radius", 15);
+    withinBounds(org);
     org.rot = rot;
     org.health = health;
     org.hnCount = hnCount;
     org.hlCount = hlCount;
     org.mated = false;
     org.nn = buildNet(hnCount, hlCount, genes);
+    org.morph = {};
+    org.morph.gender = decideGender();
+    org.nn.inputs.gender.value = (org.morph.gender == "male") ? -1:+1;
     readNet(org.nn);
     //morphology
-    org.morph = {};
     org.morph.color = getColor(genes);
-    org.morph.gender = decideGender(genes);
+    org.litterSize = Math.floor(1.0/(findAttr(genes, "litterSize") + 0.1));
     //pos is an angle.
     org.morph.eye = {};
-    org.morph.eyePos = findAttr(genes, "eyePos")*Math.PI/2;
-    org.radius = setAttr(genes, "radius", 15);
+    org.morph.eyePos = findAttr(genes, "eyePos")*Math.PI*0.5;
     org.morph.eyeRes = setAttr(genes, "eyeRes", 5);
     //eye resolution, how manny sightlines
     //current values not associated directly with other stuff like nn or morph.
@@ -525,8 +610,7 @@ function lineToPulse(x1, y1, x2, y2, x3, y3, r) {
 
 
 
-function getEyes(org){ //working on this right now.
-
+function getEyes(org){
     //center coords are org.x and org.y
     org.morph.eye.pos.r = {
         x: org.x + Math.cos(org.rot - org.morph.eyePos)*org.radius,
@@ -537,39 +621,41 @@ function getEyes(org){ //working on this right now.
         y: org.y - Math.sin(org.rot + org.morph.eyePos)*org.radius,
     }
     //get sight line end points
-    for(var i=0; i < org.morph.eyeRes; i++) {
+    for (var i=0; i < org.morph.eyeRes; i++) {
         //r = right eye, l is left...
         //these should be point, so that a line can be drawn from the eye to the point as a sight-line.
-        var offset = org.morph.eye.breadth/2 - i*org.morph.eye.breadth/org.morph.eyeRes
+        var offset = org.morph.eye.breadth*0.5 - i*org.morph.eye.breadth/org.morph.eyeRes
         org.morph.eye.pos.r[i] = {
             x: org.morph.eye.pos.r.x + Math.cos(org.rot - offset) * org.morph.eye.range,
             y: org.morph.eye.pos.r.y - Math.sin(org.rot - offset) * org.morph.eye.range,
         }
         org.morph.eye.pos.l[i] = {
-
             x: org.morph.eye.pos.l.x + Math.cos(org.rot + offset) * org.morph.eye.range,
             y: org.morph.eye.pos.l.y - Math.sin(org.rot + offset) * org.morph.eye.range,
-
         }
     }
 }
 //render should not cause any change, just render the scenario. use iterate for
 function render() {
     clearCanvas();
-    for(var i = 0; i < plants.length; i++) {
+    circle(centerX, centerY, worldR, "black", 5)
+    for (var i = 0; i < plants.length; i++) {
+        if (plants[i]==null) {
+          continue;
+        }
         var p = plants[i];
         circle(p.x, p.y, p.cal, "green")
-        ctx.fillText(Math.round(100*p.cal)/100, p.x - p.cal/2, p.y + p.cal/2);
+        ctx.fillText(Math.round(100*p.cal)/100, p.x - p.cal*0.5, p.y + p.cal*0.5);
     }
-    for(var i = 0; i < pop.length; i++) {
+    for (var i = 0; i < pop.length; i++) {
         var org = pop[i];
         if (org == null) {
           continue;
         }
         circle(org.x, org.y, org.radius, org.morph.color);
-        ctx.fillText(i, org.x - org.radius/2, org.y + org.radius/2);
+        ctx.fillText(i, org.x - org.radius*0.5, org.y + org.radius*0.5);
 
-        for(var j = 0; j < org.morph.eyeRes; j++){
+        for (var j = 0; j < org.morph.eyeRes; j++){
             line(org.morph.eye.pos.r.x, org.morph.eye.pos.r.y, org.morph.eye.pos.r[j].x, org.morph.eye.pos.r[j].y);
 
             line(org.morph.eye.pos.l.x, org.morph.eye.pos.l.y, org.morph.eye.pos.l[j].x, org.morph.eye.pos.l[j].y);
@@ -595,13 +681,14 @@ function circle(centerX, centerY, radius, color, width) {
     }
     ctx.stroke();
 }
-var iterations = 0;
-var maxspeed = 100;
 
 function eat(org, plant) {
     if(plant.cal <= 1) {
-        makePlant(plant.index, 25*rand(), rand()*canvas.width, rand()*canvas.height);
+        plants[plant.index] = null;
+        plantPop--;
+        deadPlants.push(plant.index);
         //console.log("plant #"+plant.index+ " has died")
+        return;
     }
     //10 is a nutrition modifier; should be changed.
     if(findDis(org.x,org.y,plant.x,plant.y)<(org.radius+plant.cal)*(org.radius+plant.cal) && org.nn.outputs.eat.value > 0) {
@@ -611,97 +698,162 @@ function eat(org, plant) {
     }
 }
 
-function birth(orgF, orgM) {
-  var i = 0;
-  var bits = [];
-  var mutationRate = 0.01;
-  var newGenes = deepClone(orgF.genes);
-  for (var x in newGenes.syn) {
-    bits[i++] = {val:false, gene:x};
+function conceive(orgF, orgM) {
+  if (orgF.pregnant != null) {
+    return;
   }
-  for (var i = bits.length/2; i > 0; i--) { //what if it runs over the same gene twice or more?
-    for(;;) {
-      var j = Math.floor(bits.length*rand());
-      if (bits[j].val) {
-        continue
-      }
-      bits[j].val = true;
-      newGenes.syn[bits[j].gene] = orgM.genes.syn[bits[j].gene];
-      break;
-    }
-  }
-  for (var i = 0; i < bits.length; i++) {
-    if(rand()>mutationRate) {
-      continue;
-    }
-    newGenes.syn[bits[i].gene] = pnrand();
-  }
-  
-  orgF.health -= 10;
-  var childHealth = orgF.health/2
-  orgF.health /= 2;
-  var newHome;
-  for(var i = 0;; i++) {
-    if(pop[i] == null) {
-       newHome = i;
-       break;
-    }
-  }
+  orgF.pregnant = deepClone(orgM.genes);
+  orgF.delivery = iterations + deliveryTime;
   var newGen;
   if(orgF.gen > orgM.gen) {
     newGen = orgF.gen + 1;
   } else {
     newGen = orgM.gen + 1;
   }
-    children[newHome] = makeOrg(orgF.hnCount, orgF.hlCount, newHome, orgF.x, orgF.y, orgF.rot, childHealth, newGenes, newGen);
-    console.log("pop["+newHome+"] was born or "+ orgF.index +"and "+ orgM.index);
+  orgF.childGen = newGen;
+  console.log("female "+ orgF.index +" pregnant by male "+ orgM.index);
 }
-var children = [];
+function checkHunger(org) {
+  org.nn.inputs.hunger.value = 2.0/(1+org.health/100) - 1.0;
+}
+function birth(orgF) {
+  orgF.health -= 50;
+  var childHealth = orgF.health*0.25;
+  orgF.health *= 0.75;
+  litters.push(orgF.litterSize);
+  console.log("female " + orgF.index +" gave birth to " + orgF.litterSize + " children of gen " + orgF.childGen);
+  var p = 0;
+  for (var n = 0; n < orgF.litterSize; n++) {
+    var newGenes = deepClone(orgF.genes);
+    var bits = [];
+    var i = 0;
+    for (var x in newGenes.syn) {
+      bits[i++] = {val:false, gene:x};
+    }
+    for (var i = bits.length*0.5; i > 0; i--) {
+      for (;;) {
+        var j = Math.floor(bits.length*rand());
+        if (bits[j].val) {
+          continue
+        }
+        bits[j].val = true;
+        newGenes.syn[bits[j].gene] = orgF.pregnant.syn[bits[j].gene];
+        break;
+      }
+    }
+    for (var i = 0; i < bits.length; i++) {
+      if(rand()>mutationRate) {
+        continue;
+      }
+      newGenes.syn[bits[i].gene] = pnrand();
+    }
 
+    var bits = [];
+    var i = 0;
+    for (var x in newGenes.attr) {
+      bits[i++] = {val:false, attr:x};
+    }
+    for (var i = bits.length*0.5; i > 0; i--) {
+      for (;;) {
+        var j = Math.floor(bits.length*rand());
+        if (bits[j].val) {
+          continue
+        }
+        bits[j].val = true;
+        newGenes.attr[bits[j].attr] = orgF.pregnant.attr[bits[j].attr];
+        break;
+      }
+    }
+    for (var i = 0; i < bits.length; i++) {
+      if(rand()>mutationRate) {
+        continue;
+      }
+      newGenes.attr[bits[i].attr] = rand();
+    }
+    var newHome;
+    for (;; p++) {
+      if(pop[p] == null && children[p] == null) {
+         newHome = p;
+         break;
+      }
+    }
+    children[newHome] = makeOrg(orgF.hnCount, orgF.hlCount, newHome, orgF.x, orgF.y, orgF.rot, childHealth/orgF.litterSize, newGenes, orgF.childGen)
+    births++;
+  }
+  delete orgF.pregnant;
+  delete orgF.delivery;
+  delete orgF.childGen;
+}
+var children = {};
+function withinBounds(org) {
+  var x = org.x - centerX;
+  var y = org.y - centerY;
+  var rMax = worldR - org.radius;
+  var d2 = (x*x+y*y);
+  if (rMax * rMax > d2) {
+    return;
+  }
+  var c = rMax/Math.sqrt(d2);
+  org.x = centerX + x * c;
+  org.y = centerY + y * c;
+}
+var adult = 1000;
 function iterate() {
-  //for (var j = 0; j < 1; j++) {
+    mC=0;
+    fC=0;
     for (var i = 0; i < pop.length; i++) {
       var org = pop[i];
       if (org == null) {
         continue;
       }
+      var male = (org.morph.gender == "male");
+      if (male) {
+        mC++;
+      } else {
+        fC++;
+      }
+
+      //evaluate the world
       checkEye(org, "r");
       checkEye(org, "l");
       checkEyePlants(org, "r");
       checkEyePlants(org, "l");
+      checkHunger(org);
       readNet(org.nn);
-      //mating
-      if(org.nn.outputs.mate.value > 0 && org.mated == false) {
-          for(var k = 0; k < pop.length; k++) {
-              if(pop[k] == null || findDis(pop[k].x,pop[k].y,org.x,org.y) > (pop[k].radius + org.radius)*(pop[k].radius + org.radius)) {
-                  continue;
-              }
-              //if they are the different genders, k does not want to mate, k has already mated, k is the same as org, then skip.
-              if(org.morph.gender == pop[k].morph.gender || pop[k].nn.outputs.mate.value < 0 || k.mated == true || org.index == pop[k].index) {
-                  continue;
-              }
-              var orgF, orgM;
-              if(org.morph.gender == "male") {
-                  orgM = org;
-                  orgF = pop[k];
-              } else {
-                  orgF = org;
-                  orgM = pop[k];
 
-              }
-              birth(orgF, orgM);
-              org.mated = true;
-              pop[k].mated = true;
+      if (male) {
+        continue;
+      }
 
-              break;
+      if (org.pregnant != null) {
+        if (org.delivery > iterations) {
+          continue;
+        }
+        birth(org);
+      } else if (org.nn.outputs.mate.value > 0 && org.lifespan >= adult) {
+        //mating (org = fertile female)
+        for (var k = 0; k < pop.length; k++) {
+          if (pop[k] == null || findDis(pop[k].x,pop[k].y,org.x,org.y) > (pop[k].radius + org.radius)*(pop[k].radius + org.radius)) {
+              continue;
           }
+          //if they are the different genders, k does not want to mate, k has already mated, k is the same as org, then skip.
+          if (pop[k].morph.gender == "female" || pop[k].nn.outputs.mate.value < 0 || k.mated == true) {
+              continue;
+          }
+          if (org.health < birthHealth) {
+            continue;
+          }
+          conceive(org, pop[k]);
+          pop[k].mated = true;
+          break;
+        }
       }
     }
-    
-    for(var i = 0; i < children.length; i++) {
+
+    for (var i in children) {
         if(children[i]!=null) {
-            pop[i] = deepClone(children[i]);
-            children[i] = null;
+            pop[i] = children[i];
+            delete children[i];
         }
     }
     for (var i = 0; i < pop.length; i++) {
@@ -709,47 +861,125 @@ function iterate() {
       if (org == null) {
         continue;
       }
-      if(1==1) {//actual requirements here plz
+      if(org.morph.gender == "male") {//males can mate next iteration
           org.mated = false;
       }
-      for(var l = 0; l < plants.length; l++){
+      for (var l = 0; l < plants.length; l++){
+        if (plants[l] == null) {
+          continue;
+        }
         eat(org, plants[l]);
-      }
-      if (org.health > 200) {
-          org.health = 200;
       }
       org.rot += org.nn.outputs.rot.value;
       org.x += Math.cos(org.rot) * org.nn.outputs.speed.value*maxspeed;
-      if (org.x > worldW) {
-        org.x -= worldW;
-      } else if (org.x < 0) {
-        org.x += worldW;
-      }
       org.y -= Math.sin(org.rot) * org.nn.outputs.speed.value*maxspeed;
-      if (org.y > worldH) {
-        org.y -= worldH;
-      } else if (org.y < 0) {
-        org.y += worldH;
-      }
+      withinBounds(org);
       getEyes(org);
-      org.health -= Math.abs(org.nn.outputs.speed.value);
-      if (org.health <= 0) {
-        console.log("death of " + org.index);
-        pop[i] = null;
+      if (org.health > 0) {
+        var metab = 0.01*Math.sqrt(org.health);
+        org.health -= Math.abs(org.nn.outputs.speed.value) + metab;
       }
-    
-    
+      if (org.health <= 0) {
+        //console.log("death of " + org.index);
+        pop[i] = null;
+        deaths++;
+        mortality.push(org.lifespan);
+      }
+      org.lifespan++;
     }
-  //}
+    plantDelay+=rand();
+    if (plantDelay >= plantThreshold) {
+      plantDelay-=plantThreshold;
+      if (deadPlants.length > 0) {
+        grow(deadPlants.pop());
+      } else {
+        grow(plants.length);
+      }
+    }
   iterations++;
-  if (true) {
+  marker++;
+  if (marker>=maxMarker) {
+    console.log(mC+ " " + fC);
+    marker = 0;
+    var popmark = 0;
+    for (var i = 0; i < pop.length; i++) {
+      if (pop[i]!=null) {
+        popmark++;
+      }
+    }
+    popMarks.push([iterations, popmark]);
+  }
+
+  if (rendering) {
     render();
+  }
+  if (fC == 0 || mC == 0) {
+    stop(true);
+    console.log("No reproduction possible.");
+  } else if (iterations == maxIteration) {
+    stop(true);
+    console.log("reached max iterations");
+  }
+}
+function prepareData(file, x, element) {
+  var rows = [];
+  for (var i = 0; i < x.length; i++) {
+    rows.push(x[i].join(','));
+  }
+  var d = new Blob([rows.join("\r\n")], { type: 'text/csv' });
+  var a = document.getElementById(element);
+  a.download = file+".csv";
+  a.target = "_blank";
+  a.href = URL.createObjectURL(d);
+}
+
+function buildMortaility() {
+  mortality.sort(function(a, b){return a<b ? -1:1;});
+  var norm = 100.0/(mortality.length + fC + mC);
+  var csv = [["#age at death", "mortality (%)"]];
+  for (var i = 0; i < mortality.length; i++) {
+      var x = mortality[i];
+      csv.push([x, (i+1)*norm]);
+  }
+  console.log(csv);
+  prepareData("mortality-"+seed+"-"+mutationRate+"-"+plantThreshold, csv, "downloadAnchorElem");
+}
+function buildPopStat() {
+  var csv = [["#iterations", "population"]];
+  for (var i = 0; i < popMarks.length; i++) {
+      csv.push(popMarks[i]);
+  }
+  console.log(csv);
+  prepareData("popstats-"+seed+"-"+mutationRate+"-"+plantThreshold, popMarks, "downloadPop");
+}
+
+function saveData() {
+  buildPopStat();
+  buildMortaility();
+  geid("downloadAnchorElem").click();
+  geid("downloadPop").click();
+  if (apt < 50) {
+    apt += 5;
+    getData(1, apt, 0.02);
+  } else {
+    console.log("finished");
   }
 }
 
-var rendering = false;
-
+var apt = 5;
+function getData(s33d, pt, mr) {
+  seed = s33d;
+  xorRandom = xor4096(seed);
+  setConst();
+  poputat(geid('popNum').value);
+  plantThreshold = pt;
+  mutationRate = mr;
+  callBack = saveData;
+  run(1);
+}
 function findDis(x1,y1,x2,y2) {
   return (x1-x2)*(x1-x2)+(y1-y2)*(y1-y2);
   //requires a Math.sqrt to get actual value.
 }
+poputat(geid('popNum').value);
+render();
